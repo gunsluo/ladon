@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/gunsluo/ladon/manager/rbac/store"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	"github.com/ory/ladon"
 	"github.com/ory/ladon/manager/memory"
 )
@@ -95,6 +99,20 @@ var cases = []struct {
 }
 
 func main() {
+	// The database manager expects a sqlx.DB object
+	db, err := sqlx.Open("postgres", "user=root password=root host=127.0.0.1 port=5432 dbname=ladon sslmode=disable") // Your driver and data source.
+	if err != nil {
+		log.Fatalf("Could not connect to database: %s", err)
+	}
+
+	// You must call SQLManager.CreateSchemas(schema, table) before use
+	manager := store.NewStoreManager(db, nil)
+	n, err := manager.CreateSchemas("", "")
+	if err != nil {
+		log.Fatalf("Failed to create schemas: %s", err)
+	}
+	log.Printf("applied %d migrations", n)
+
 	// Instantiate ladon with the default in-memory store.
 	warden := &ladon.Ladon{
 		Manager: memory.NewMemoryManager(),
