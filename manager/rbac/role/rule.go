@@ -2,22 +2,35 @@ package role
 
 import (
 	"reflect"
+
+	"github.com/jinzhu/gorm"
 )
 
 // RuleManager is the main interface for rule management.
 type RuleManager struct {
-	rules Model
-	rm    *RoleManager
+	rules   Model
+	rm      *RoleManager
+	adapter *Adapter
 
+	autoSave           bool
 	autobuildRoleLinks bool
 }
 
 func newRuleManager(params ...interface{}) *RuleManager {
-	return &RuleManager{
+	m := &RuleManager{
 		rules:              newModel(),
 		rm:                 newRoleManager(10),
+		autoSave:           true,
 		autobuildRoleLinks: true,
 	}
+
+	if len(params) == 1 {
+		if db, ok := params[0].(*gorm.DB); ok {
+			m.adapter = newAdapter(db)
+		}
+	}
+
+	return m
 }
 
 // AddRoleForUserInDomain adds a role for a user inside a domain.
@@ -59,20 +72,15 @@ func (m *RuleManager) addNamedGroupingRule(ptype string, params ...interface{}) 
 func (m *RuleManager) addRule(sec string, ptype string, rule []string) bool {
 	ruleAdded := m.rules.Add(sec, ptype, rule)
 
-	/*
-		if ruleAdded {
-			if m.adapter != nil && m.autoSave {
-				err := m.adapter.AddPolicy(sec, ptype, rule)
-				if err != nil && err.Error() != "not implemented" {
-					panic(err)
-				} else if err == nil {
-					if m.watcher != nil {
-						m.watcher.Update()
-					}
-				}
+	if ruleAdded {
+		if m.adapter != nil && m.autoSave {
+			err := m.adapter.AddRule(sec, ptype, rule)
+			if err != nil && err.Error() != "not implemented" {
+				//panic(err)
+				LogPrint(err)
 			}
 		}
-	*/
+	}
 
 	return ruleAdded
 }
@@ -118,20 +126,15 @@ func (m *RuleManager) removeFilteredNamedRule(ptype string, fieldIndex int, fiel
 func (m *RuleManager) removeFilteredRule(sec string, ptype string, fieldIndex int, fieldValues ...string) bool {
 	ruleRemoved := m.rules.RemoveFilteredRule(sec, ptype, fieldIndex, fieldValues...)
 
-	/*
-		if ruleRemoved {
-			if m.adapter != nil && m.autoSave {
-				err := m.adapter.removeFilteredRules(sec, ptype, fieldIndex, fieldValues...)
-				if err != nil && err.Error() != "not implemented" {
-					panic(err)
-				} else if err == nil {
-					if m.watcher != nil {
-						m.watcher.Update()
-					}
-				}
+	if ruleRemoved {
+		if m.adapter != nil && m.autoSave {
+			err := m.adapter.RemoveFilteredRule(sec, ptype, fieldIndex, fieldValues...)
+			if err != nil && err.Error() != "not implemented" {
+				//panic(err)
+				LogPrint(err)
 			}
 		}
-	*/
+	}
 
 	return ruleRemoved
 }
@@ -162,7 +165,7 @@ func (m *RuleManager) GetUsersForRole(name string) []string {
 
 // HasRoleForUserInDomain determines whether a user has a role.
 func (m *RuleManager) HasRoleForUserInDomain(name, domain string, role string) bool {
-	roles := m.GetRolesForUser(name, domain)
+	roles := m.GetRolesForUserInDomain(name, domain)
 
 	hasRole := false
 	for _, r := range roles {

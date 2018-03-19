@@ -220,3 +220,20 @@ func (ast *Assertion) buildRoleLinks(rm *RoleManager) {
 	LogPrint("Role links for: " + ast.Key)
 	ast.RM.PrintRoles()
 }
+
+// loadRuleLineToModel loads a text line as a rule to model.
+func loadRuleLineToModel(line string, model Model) {
+	if line == "" {
+		return
+	}
+
+	if strings.HasPrefix(line, "#") {
+		return
+	}
+
+	tokens := strings.Split(line, ", ")
+
+	key := tokens[0]
+	sec := key[:1]
+	model[sec][key].Rule = append(model[sec][key].Rule, tokens[1:])
+}
